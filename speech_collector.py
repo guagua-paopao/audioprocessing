@@ -20,25 +20,29 @@ for filename in os.listdir("recordings/"):
 
 for k, v in names_dict.items():
     print(f"{v:>3} {k}")
+    if v >= TARGET:
+        names.remove(k)
 
-for name in names:
-    if names_dict[name] > TARGET:
-        names_dict.pop(name)
-        names.remove(name)
+
+
 
 FS = 16000
 SECONDS = 3
-running = True
+running = (len(names) > 0)
 
 while running:
     name = names[randint(0, len(names) - 1)]
-    while names_dict[name] > TARGET:
+    while names_dict[name] >= TARGET and len(names) > 0:
+        names_dict.pop(name)
+        names.remove(name)
         name = names[randint(0, len(names) - 1)]
+    if len(names) == 0:
+        break
     cmd = input(f"{name} ({names_dict[name]}/{TARGET})").strip()
     if cmd == "" or cmd == "p":
-        print(f"RECORDING...")
         # record
         r = sd.rec(SECONDS * FS, samplerate=FS, channels=1)
+        print(f"RECORDING...")
         sd.wait()
         r_norm = 0.99 * r / max(abs(r))
 
@@ -50,5 +54,5 @@ while running:
             sd.play(r_norm, FS)
         names_dict[name] += 1
     else:
-        print("Stopping...")
         running = False
+print("Stopping...")
