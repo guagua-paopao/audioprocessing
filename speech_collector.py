@@ -14,7 +14,7 @@ for n in names:
 TARGET = 20
 
 # count existing recordings
-for filename in os.listdir("recordings/"):
+for filename in os.listdir("data/audio/"):
     if filename[:-7].title() in names and filename[-4:] == ".wav":
         name = filename[:-7].title()
         names_dict[name] += 1
