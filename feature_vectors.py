@@ -1,8 +1,9 @@
-import librosa
 import os
-import sounddevice as sd
-import soundfile as sf
+
+import librosa
 import numpy as np
+import soundfile as sf
+
 name_file = open("NAMES.txt")
 names = [name.strip().lower() for name in name_file.readlines()]
 mfcc_dict = {}

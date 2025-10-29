@@ -1,52 +1,63 @@
 # features.py
+import csv
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
-from pathlib import Path
-import csv
 
 AUDIO_ROOT = Path("data/audio")
-FEAT_ROOT  = Path("data/features")
-INDEX_CSV  = FEAT_ROOT / "dataset_index.csv"
+FEAT_ROOT = Path("data/features")
+INDEX_CSV = FEAT_ROOT / "dataset_index.csv"
+
 
 def frame_signal(x, fs=16000, win_ms=25, hop_ms=10):
     # Speech framing: 25 ms window, 10 ms hop (for MFCC)
     win = int(fs * win_ms / 1000)
     hop = int(fs * hop_ms / 1000)
     n_frames = 1 + max(0, (len(x) - win) // hop)
-    frames = np.stack([x[i*hop : i*hop + win] for i in range(n_frames)], axis=1)  # shape (win, T)
+    frames = np.stack([x[i * hop: i * hop + win] for i in range(n_frames)], axis=1)  # shape (win, T)
     return frames
+
 
 def mag_phase(speech_frame):
     # Hamming window + FFT -> magnitude & phase (Lab 2)
     windowed = speech_frame * np.hamming(len(speech_frame))
-    X = np.fft.rfft(windowed, n=512)                         # 512-point FFT
+    X = np.fft.rfft(windowed, n=512)  # 512-point FFT
     mag = np.abs(X)
     phase = np.angle(X)
     return mag, phase
 
+
 def mel_filterbank(n_fft=512, sr=16000, n_mels=40, fmin=0, fmax=None):
     # Build triangular Mel filterbank matrix H (shape: n_mels × (n_fft/2+1)) (Lab 3)
-    if fmax is None: fmax = sr/2
+    if fmax is None: fmax = sr / 2
+
     # Hz <-> Mel conversions (Lab 3)
-    def hz2mel(f): return 2595.0 * np.log10(1.0 + f / 700.0)
-    def mel2hz(m): return 700.0 * (10**(m/2595.0) - 1.0)
+    def hz2mel(f):
+        return 2595.0 * np.log10(1.0 + f / 700.0)
+
+    def mel2hz(m):
+        return 700.0 * (10 ** (m / 2595.0) - 1.0)
+
     mmin, mmax = hz2mel(fmin), hz2mel(fmax)
     m_points = np.linspace(mmin, mmax, n_mels + 2)  # include edges
     f_points = mel2hz(m_points)
-    bins = np.floor((n_fft//2 + 1) * f_points / (sr/2)).astype(int)  # Hz -> spectrum bin
+    bins = np.floor((n_fft // 2 + 1) * f_points / (sr / 2)).astype(int)  # Hz -> spectrum bin
 
-    H = np.zeros((n_mels, n_fft//2 + 1), dtype=np.float32)
-    for m in range(1, n_mels+1):
-        f_left, f_center, f_right = bins[m-1], bins[m], bins[m+1]
+    H = np.zeros((n_mels, n_fft // 2 + 1), dtype=np.float32)
+    for m in range(1, n_mels + 1):
+        f_left, f_center, f_right = bins[m - 1], bins[m], bins[m + 1]
         if f_center == f_left: f_center += 1  # avoid zero width
         if f_right == f_center: f_right += 1
         # left slope
-        H[m-1, f_left:f_center] = (np.arange(f_left, f_center) - f_left) / (f_center - f_left)
+        H[m - 1, f_left:f_center] = (np.arange(f_left, f_center) - f_left) / (f_center - f_left)
         # right slope
-        H[m-1, f_center:f_right] = (f_right - np.arange(f_center, f_right)) / (f_right - f_center)
+        H[m - 1, f_center:f_right] = (f_right - np.arange(f_center, f_right)) / (f_right - f_center)
     return H
 
+
 _MEL_H = mel_filterbank()
+
 
 def dct(x, axis=0):
     """
@@ -63,15 +74,16 @@ def dct(x, axis=0):
     basis[0, :] *= 1.0 / np.sqrt(2.0)
 
     # Move target axis to last, apply tensordot, then move back
-    x_move = np.moveaxis(x, axis, -1)                # [..., N]
+    x_move = np.moveaxis(x, axis, -1)  # [..., N]
     y = np.tensordot(x_move, basis, axes=([-1], [0]))  # [..., N]
     y = np.moveaxis(y, -1, axis)
     return y
 
+
 def wav_to_mfcc(wav_path, sr=16000, add_energy=True, add_deltas=True):
     x, fs = sf.read(wav_path, dtype='float32')
     assert fs == sr, f"Sample rate mismatch: {fs} != {sr}"
-    if x.ndim > 1: x = x[:,0]
+    if x.ndim > 1: x = x[:, 0]
     frames = frame_signal(x, fs=sr, win_ms=25, hop_ms=10)
     mags = []
     for i in range(frames.shape[1]):
@@ -87,19 +99,20 @@ def wav_to_mfcc(wav_path, sr=16000, add_energy=True, add_deltas=True):
     feats = mfcc
 
     if add_energy:
-        log_energy = np.log((frames**2).sum(axis=0) + 1e-10)[None, :]
+        log_energy = np.log((frames ** 2).sum(axis=0) + 1e-10)[None, :]
         feats = np.concatenate([feats, log_energy], axis=0)
 
     if add_deltas:
         def delta(F):
             # Simple ±1 frame central difference
-            pad = np.pad(F, ((0,0),(1,1)), mode='edge')
-            return (pad[:,2:] - pad[:,:-2]) * 0.5
+            pad = np.pad(F, ((0, 0), (1, 1)), mode='edge')
+            return (pad[:, 2:] - pad[:, :-2]) * 0.5
+
         d = delta(feats)
         dd = delta(d)
         feats = np.concatenate([feats, d, dd], axis=0)
 
-    return feats.astype(np.float32)   # shape: [D, T]
+    return feats.astype(np.float32)  # shape: [D, T]
 
 
 def main(audio_root: Path, sr: int = 16000):
@@ -141,6 +154,7 @@ def main(audio_root: Path, sr: int = 16000):
         writer.writerows(rows)
 
     print(f"Done! Processed {len(rows)} files. Index saved to: {INDEX_CSV}")
+
 
 if __name__ == "__main__":
     main(AUDIO_ROOT, sr=16000)

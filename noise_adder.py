@@ -1,7 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-import matplotlib.pyplot as plt
 
 speech, fs_s = sf.read("data/audio/amber010.wav")
 noise, fs_n = sf.read("noise.wav")
@@ -11,7 +11,7 @@ speech = speech[:45000]
 
 
 def power(signal):
-    return np.mean(signal**2)
+    return np.mean(signal ** 2)
 
 
 def snr(s, n):

@@ -1,5 +1,6 @@
 import os
 from random import randint
+
 import sounddevice as sd
 import soundfile as sf
 
@@ -26,7 +27,6 @@ for k, v in names_dict.items():
         print(f' ✅  {k}')
     else:
         print(f"{v:>3} {k}")
-
 
 FS = 16000
 SECONDS = 3
